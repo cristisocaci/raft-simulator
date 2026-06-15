@@ -1,0 +1,71 @@
+\chapter{Conclusions and Future Work}
+\label{ch:conclusions}
+
+This thesis investigated how the choice of network topology shapes the operational characteristics of the Raft consensus algorithm. The investigation combined a custom discrete-event simulator, a real-time visualisation dashboard and a campaign of seven experiments comparing Star, Ring, Mesh, Tree and Bus topologies under varying conditions of cluster size, message delay, packet loss and node failure.
+
+\section{Summary of Contributions}
+
+The contributions of this thesis can be summarised as follows.
+
+\begin{enumerate}
+    \item \textbf{A reproducible simulation framework.} We implemented a tick-driven Raft simulator in Python that supports five distinct topologies, configurable per-hop delay and packet loss, deterministic seeding and a rich event log. The framework is approximately 950 lines of code. The codebase is structured to make it easy to add new topologies, new metrics or alternative consensus algorithms.
+
+    \item \textbf{A web-based visualisation and analysis tool.} The accompanying React-and-FastAPI dashboard provides a live view of any running simulation, archives results in SQLite, supports comparative statistical analysis across multiple runs and exports results to CSV. The dashboard was used to validate the qualitative behaviour of the simulator during development and is also useful pedagogically.
+
+    \item \textbf{A systematic experimental study.} We executed seven experiments covering baseline performance, scalability, delay sensitivity, packet loss sensitivity, fault tolerance, leader recovery and combined stress. The total experimental output covers more than 200 individual simulation runs aggregated into statistically meaningful summaries.
+
+    \item \textbf{Quantified topology effects.} The analysis quantifies the difference among topologies in absolute terms. Mesh is consistently best; Bus is consistently worst. The other topologies fall in a predictable order driven by their diameter and connectivity. We provide tables and figures that give engineers numerical anchors for sizing their own deployments.
+\end{enumerate}
+
+\section{Answers to the Research Questions}
+
+We can now return to the research questions stated at the beginning of the thesis.
+
+\paragraph{How does network topology affect leader election time?}
+At small scales and benign conditions, topology has only a marginal effect on election time, which is dominated by the randomised election timeout. As the cluster grows, the per-hop delay increases or packet loss appears, the topologies diverge sharply. Mesh's election time is essentially constant across all conditions tested. Ring and Bus exhibit linear or worse degradation as the diameter grows. Star and Tree sit in between, performing well until a critical node fails.
+
+\paragraph{What is the relationship between topology and message overhead?}
+Total message count is dominated by heartbeats and log replication, both of which scale with the number of followers rather than with topology. The topology effect manifests instead through average message latency, which is proportional to the average path length. Mesh has constant one-hop latency; Bus latency grows linearly with cluster size; the others are intermediate.
+
+\paragraph{How do different topologies respond to failures?}
+Topologies with high connectivity (Mesh, Ring, Star to a lesser extent) absorb random failures with little degradation. Topologies with structurally critical nodes (Star hub, Tree root) lose all functionality when those nodes fail. The simulation made this intuition concrete by showing Mesh dropping zero messages under repeated failures while Tree and Bus dropped 40 and 28 respectively in equivalent runs.
+
+\paragraph{Which topologies provide the best trade-off between performance and fault tolerance?}
+Mesh dominates on both axes. Star is a reasonable compromise when the hub is hardened against failure. Tree is acceptable for hierarchical use cases where the root can be replicated. Ring and Bus should be avoided whenever the workload is non-trivial.
+
+\section{Limitations Acknowledged Concretely}
+
+A simulation-based study has limitations that have been discussed throughout the thesis. They are summarised here for clarity.
+
+\begin{itemize}
+    \item The network model assumes uniform per-hop delay and uniform per-hop packet loss. Real networks have heterogeneous and correlated effects.
+    \item The failure model assumes independent per-tick failures. Real failures tend to be correlated, particularly when triggered by infrastructure-wide incidents.
+    \item The simulator implements core Raft but not every optimisation found in production systems (pre-vote, leadership transfer, batching, snapshotting). Some of these would alter the absolute numbers, although we believe they would not alter the relative ordering of the topologies.
+    \item Five repetitions per scenario is sufficient for the qualitative ordering observed in our results, but tighter confidence intervals would require more.
+\end{itemize}
+
+\section{Future Work}
+\label{sec:future_work}
+
+There are several promising directions in which this work could be extended.
+
+\textbf{Dynamic topologies.} Real networks change. Links go up and down, overlays are reconfigured, and clusters scale up or down. A simulator that supports dynamic topology changes during a single run would enable the study of how Raft behaves during such reconfigurations. The current simulator already represents the topology as an explicit graph, so the engineering effort to support dynamism is moderate.
+
+\textbf{Realistic delay distributions.} Replacing the constant per-hop delay with a distribution drawn from real network traces would improve external validity. Public datasets are available for major data centres and for selected wide-area paths.
+
+\textbf{Correlated failure models.} The current failure model treats node failures as independent per-tick events. Real-world incidents (rack or data-centre outages, correlated software bugs) tend to fail multiple nodes together. Enriching the failure model with correlated failures would test whether the topology hierarchy observed here still holds under more realistic fault patterns.
+
+\textbf{Raft-specific optimisations.} Production Raft implementations commonly add pre-vote, leadership transfer and log-entry batching on top of the core algorithm. Implementing these optimisations in the simulator and re-running the experiments would show whether they narrow the gap between Mesh and the other topologies, or whether the topology effect persists regardless of algorithmic refinements.
+
+\textbf{Algorithm variants.} The simulator architecture makes it straightforward to plug in different consensus algorithms while keeping the topology layer constant. Comparing Raft, Paxos and EPaxos under varying topologies would extend the present work along the second axis discussed in Section~\ref{ch:discussion}.
+
+\textbf{Real-system validation.} The experimental predictions in this thesis are concrete enough to be falsifiable. A measurement campaign on a controllable network testbed (for example, using \texttt{tc} on Linux to inject delay and loss) could quantify the gap between simulation and reality. We expect the gap to be small.
+
+\textbf{Adversarial scenarios.} The current failure model is non-adversarial. A study that simulates Byzantine behaviour, for example along the lines of practical Byzantine fault tolerance \citep{castro1999}, or even a milder form of adversarial node selection (the adversary always fails the leader, or always fails the highest-degree node), would test the topologies under conditions closer to the security-critical end of the spectrum.
+
+\section{Closing Remarks}
+
+Distributed consensus is a thirty-year-old problem with a long literature, and the Raft algorithm is now mature enough that engineers can treat it as a black box for many purposes. The data in this thesis suggests that the network on which Raft runs is just as important as the algorithm itself. Choosing a good topology, or hardening a structurally vulnerable one, can change leader election time by a factor of three and throughput by an even larger factor under stress.
+
+The simulator and visualisation tool produced by this work are open and reproducible. They are intended both as research artefacts and as pedagogical aids for students learning about distributed systems. We hope they will contribute to a more nuanced understanding of how consensus algorithms interact with their underlying networks, and to better-engineered systems as a result.
+

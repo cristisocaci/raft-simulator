@@ -1,0 +1,460 @@
+\chapter{Experimental Results}
+\label{ch:results}
+
+This chapter presents the data produced by the seven experiments described in Chapter~\ref{ch:experiments}. The structure of the chapter follows the order of the experiments. Each section contains the measured values, one or more figures, and a short interpretation. Cross-experiment synthesis is reserved for Chapter~\ref{ch:discussion}.
+
+All values reported below are means across the repetitions of the corresponding scenario, unless explicitly stated otherwise. Where standard deviation is reported, it is the sample standard deviation.
+
+\section{Baseline Comparison}
+
+Table~\ref{tab:exp1_baseline} summarises the baseline experiment for a five-node cluster with the default parameters.
+
+\begin{table}[H]
+\centering
+\caption{Baseline metrics for a five-node cluster (10 runs per topology, default parameters).}
+\label{tab:exp1_baseline}
+\small
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Metric} & \textbf{Star} & \textbf{Ring} & \textbf{Mesh} & \textbf{Tree} & \textbf{Bus} \\
+\midrule
+First election time (ticks) & 210.2 & 196.7 & 195.6 & 208.8 & 201.4 \\
+Convergence time (ticks)    & 210.2 & 196.7 & 195.6 & 208.8 & 201.4 \\
+Total messages sent         & 140.2 & 142.2 & 141.7 & 141.1 & 141.0 \\
+Election count              & 1.0   & 1.0   & 1.0   & 1.0   & 1.0   \\
+Throughput (entries/100 ticks) & 5.0 & 5.0 & 5.0 & 5.0 & 5.0 \\
+Avg.\ latency (hops)        & 1.53 & 1.50 & 1.00 & 1.72 & 1.86 \\
+Avg.\ latency (ticks)       & 15.29 & 14.98 & 10.00 & 17.21 & 18.60 \\
+Entries committed           & 5.0  & 5.0  & 5.0  & 5.0  & 5.0  \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The first observation is that, in this benign regime, every topology successfully elects a leader on the first attempt and commits all five entries. The election count is exactly one for all topologies, the entries committed is exactly five, and the throughput converges to the same value of five entries per hundred ticks because the bottleneck is the rate at which the leader appends new entries rather than any property of the network.
+
+The differences appear in the latency metrics. Mesh has a constant one-hop average latency, as expected from a fully connected graph. Ring and Star have an average path length close to 1.5 hops, consistent with their structural properties at $n=5$. Tree and Bus exhibit the longest paths because their diameters grow more steeply with the number of nodes; on a five-node binary tree the leaves are two hops from the root, and on a five-node bus the endpoints are four hops apart.
+
+Figure~\ref{fig:exp1_latency} visualises this pattern.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    topology bar,
+    ylabel={Average latency (ticks)},
+    symbolic x coords={Star, Ring, Mesh, Tree, Bus},
+    xtick=data,
+    ymin=0, ymax=22,
+    title={\small Average message latency, baseline conditions},
+]
+\addplot[fill=starcolor!70] coordinates {
+    (Star, 15.29) (Ring, 14.98) (Mesh, 10.00) (Tree, 17.21) (Bus, 18.60)
+};
+\end{axis}
+\end{tikzpicture}
+\caption{Average message latency across five-node baseline runs. Mesh achieves the lowest latency by virtue of being one hop end-to-end.}
+\label{fig:exp1_latency}
+\end{figure}
+
+The first leader election time is dominated by the randomised election timeout (150--300 ticks) rather than by topology. Mesh and Ring elect slightly faster than the others, but the difference of about 15 ticks is within the standard deviation of the timer itself.
+
+\section{Cluster Size Scalability}
+
+The data from Experiment 2 reveal the most dramatic differences among the topologies. Table~\ref{tab:exp2_election} reports the first leader election time as a function of cluster size.
+
+\begin{table}[H]
+\centering
+\caption{First leader election time (ticks) versus cluster size.}
+\label{tab:exp2_election}
+\begin{tabular}{rrrrrr}
+\toprule
+\textbf{Nodes} & \textbf{Star} & \textbf{Ring} & \textbf{Mesh} & \textbf{Tree} & \textbf{Bus} \\
+\midrule
+3  & 214.0 & 210.6 & 210.6 & 214.0 & 210.8 \\
+5  & 199.4 & 187.0 & 185.6 & 202.2 & 194.8 \\
+7  & 200.0 & 206.4 & 186.4 & 209.4 & 210.0 \\
+9  & 194.8 & 311.4 & 178.0 & 250.6 & 300.2 \\
+11 & 195.0 & 357.6 & 176.8 & 249.4 & 410.0 \\
+13 & 265.4 & 514.0 & 176.2 & 438.6 & 625.6 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    topology line,
+    ylabel={Election time (ticks)},
+    xlabel={Cluster size (nodes)},
+    legend pos=north west,
+    legend cell align=left,
+    title={\small Leader election time as cluster size grows},
+]
+\addplot[color=starcolor, mark=square*, thick] coordinates {(3,214) (5,199.4) (7,200) (9,194.8) (11,195) (13,265.4)};
+\addplot[color=ringcolor, mark=triangle*, thick] coordinates {(3,210.6) (5,187) (7,206.4) (9,311.4) (11,357.6) (13,514)};
+\addplot[color=meshcolor, mark=*, thick] coordinates {(3,210.6) (5,185.6) (7,186.4) (9,178) (11,176.8) (13,176.2)};
+\addplot[color=treecolor, mark=diamond*, thick] coordinates {(3,214) (5,202.2) (7,209.4) (9,250.6) (11,249.4) (13,438.6)};
+\addplot[color=buscolor, mark=pentagon*, thick] coordinates {(3,210.8) (5,194.8) (7,210) (9,300.2) (11,410) (13,625.6)};
+\legend{Star, Ring, Mesh, Tree, Bus}
+\end{axis}
+\end{tikzpicture}
+\caption{First leader election time as a function of cluster size. Mesh is essentially flat; Ring and Bus degrade quickly past nine nodes.}
+\label{fig:exp2_election}
+\end{figure}
+
+Up to seven nodes, all topologies elect within roughly 200 ticks, which is the centre of the timeout distribution. Beyond seven nodes, however, Ring, Tree and Bus begin to suffer. By thirteen nodes, the Bus topology takes more than three times as long as Mesh to elect a leader, and Ring is not far behind. Star also degrades, but more gently and only at the largest size tested. Mesh is essentially flat, even decreasing slightly as the cluster grows because more candidates can be elected and the chance that at least one wins on the first attempt rises.
+
+The mechanism is straightforward. In Ring and Bus, each \texttt{RequestVote} traverses up to $\lfloor n/2 \rfloor$ or $n-1$ hops respectively, which means votes arrive late and split votes become more likely. The cluster must then go through one or more failed elections before settling.
+
+Average path length, reported in Table~\ref{tab:exp2_hops}, shows the structural reason directly.
+
+\begin{table}[H]
+\centering
+\caption{Average message latency in hops versus cluster size.}
+\label{tab:exp2_hops}
+\begin{tabular}{rrrrrr}
+\toprule
+\textbf{Nodes} & \textbf{Star} & \textbf{Ring} & \textbf{Mesh} & \textbf{Tree} & \textbf{Bus} \\
+\midrule
+3  & 1.19 & 1.00 & 1.00 & 1.19 & 1.40 \\
+5  & 1.46 & 1.50 & 1.00 & 1.79 & 2.01 \\
+7  & 1.51 & 2.00 & 1.00 & 2.13 & 2.52 \\
+9  & 1.70 & 2.49 & 1.00 & 2.52 & 3.01 \\
+11 & 1.72 & 2.99 & 1.00 & 2.86 & 4.23 \\
+13 & 1.75 & 3.48 & 1.00 & 3.26 & 4.51 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    topology line,
+    ylabel={Average latency (hops)},
+    xlabel={Cluster size (nodes)},
+    legend pos=north west,
+    legend cell align=left,
+    title={\small Average path length grows with cluster size},
+]
+\addplot[color=starcolor, mark=square*, thick] coordinates {(3,1.19) (5,1.46) (7,1.51) (9,1.70) (11,1.72) (13,1.75)};
+\addplot[color=ringcolor, mark=triangle*, thick] coordinates {(3,1.00) (5,1.50) (7,2.00) (9,2.49) (11,2.99) (13,3.48)};
+\addplot[color=meshcolor, mark=*, thick] coordinates {(3,1.00) (5,1.00) (7,1.00) (9,1.00) (11,1.00) (13,1.00)};
+\addplot[color=treecolor, mark=diamond*, thick] coordinates {(3,1.19) (5,1.79) (7,2.13) (9,2.52) (11,2.86) (13,3.26)};
+\addplot[color=buscolor, mark=pentagon*, thick] coordinates {(3,1.40) (5,2.01) (7,2.52) (9,3.01) (11,4.23) (13,4.51)};
+\legend{Star, Ring, Mesh, Tree, Bus}
+\end{axis}
+\end{tikzpicture}
+\caption{Average message latency in hops as a function of cluster size.}
+\label{fig:exp2_hops}
+\end{figure}
+
+Mesh stays at one hop for any size. Star plateaus quickly because every node is two hops from every other through the hub. Tree, Ring and Bus all increase, but at different rates. The growth of Bus is essentially linear, of Ring approximately linear, and of Tree logarithmic, which matches the textbook diameters of these structures.
+
+\section{Sensitivity to Message Delay}
+
+Experiment 3 sweeps the per-hop delay from 2 to 50 ticks, holding everything else at the defaults. Table~\ref{tab:exp3_election} reports the first leader election time.
+
+\begin{table}[H]
+\centering
+\caption{First leader election time (ticks) versus per-hop message delay.}
+\label{tab:exp3_election}
+\begin{tabular}{rrrrrr}
+\toprule
+\textbf{Delay} & \textbf{Star} & \textbf{Ring} & \textbf{Mesh} & \textbf{Tree} & \textbf{Bus} \\
+\midrule
+2  & 172.4 & 171.2 & 169.6 & 172.8 & 172.0 \\
+5  & 183.2 & 177.2 & 175.6 & 182.6 & 181.0 \\
+10 & 199.4 & 187.0 & 185.6 & 202.2 & 194.8 \\
+20 & 231.2 & 215.2 & 205.8 & 232.2 & 236.0 \\
+30 & 255.8 & 277.0 & 226.0 & 272.7 & 272.0 \\
+50 & 432.6 & 382.2 & 266.2 & 774.0 & 587.6 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    topology line,
+    ylabel={Election time (ticks)},
+    xlabel={Per-hop delay (ticks)},
+    legend pos=north west,
+    legend cell align=left,
+    title={\small Election time under increasing per-hop delay},
+]
+\addplot[color=starcolor, mark=square*, thick] coordinates {(2,172.4) (5,183.2) (10,199.4) (20,231.2) (30,255.8) (50,432.6)};
+\addplot[color=ringcolor, mark=triangle*, thick] coordinates {(2,171.2) (5,177.2) (10,187) (20,215.2) (30,277) (50,382.2)};
+\addplot[color=meshcolor, mark=*, thick] coordinates {(2,169.6) (5,175.6) (10,185.6) (20,205.8) (30,226) (50,266.2)};
+\addplot[color=treecolor, mark=diamond*, thick] coordinates {(2,172.8) (5,182.6) (10,202.2) (20,232.2) (30,272.75) (50,774)};
+\addplot[color=buscolor, mark=pentagon*, thick] coordinates {(2,172) (5,181) (10,194.8) (20,236) (30,272) (50,587.6)};
+\legend{Star, Ring, Mesh, Tree, Bus}
+\end{axis}
+\end{tikzpicture}
+\caption{First leader election time as the per-hop delay grows.}
+\label{fig:exp3_election}
+\end{figure}
+
+For small to moderate delays, all topologies behave similarly: the election time grows by roughly the round-trip cost. Once the per-hop delay reaches 50 ticks, the topologies diverge sharply. Mesh, with its one-hop diameter, suffers minimal degradation; the election time is barely 50\% above its low-delay value. Tree, which has the worst case of $O(\log n)$ but with a five-node cluster has a structural diameter of three, takes more than four times longer because some \texttt{RequestVote} round trips now exceed the lower bound of the election timeout, causing repeated retries. Bus shows similar but slightly milder degradation.
+
+The qualitative lesson is that election timeouts must be tuned with respect to the topology's diameter, not just the average path length. A timeout that is comfortable for Mesh becomes pathological for Bus or Tree once the per-hop delay grows.
+
+\section{Sensitivity to Packet Loss}
+
+Experiment 4 varies the packet loss rate. Table~\ref{tab:exp4_dropped} reports the total number of messages dropped during a run.
+
+\begin{table}[H]
+\centering
+\caption{Total messages dropped versus packet loss rate.}
+\label{tab:exp4_dropped}
+\begin{tabular}{rrrrrr}
+\toprule
+\textbf{Loss \%} & \textbf{Star} & \textbf{Ring} & \textbf{Mesh} & \textbf{Tree} & \textbf{Bus} \\
+\midrule
+0  & 0.0  & 0.0  & 0.0  & 0.0  & 0.0  \\
+5  & 10.8 & 10.4 & 6.6  & 11.0 & 13.8 \\
+10 & 22.4 & 18.8 & 13.6 & 21.6 & 20.8 \\
+20 & 30.8 & 34.0 & 27.0 & 38.6 & 38.2 \\
+30 & 38.2 & 40.8 & 35.6 & 40.4 & 43.4 \\
+40 & 46.8 & 50.4 & 43.0 & 52.2 & 50.2 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    topology line,
+    ylabel={Messages dropped},
+    xlabel={Per-hop loss (\%)},
+    legend pos=north west,
+    legend cell align=left,
+    title={\small Number of dropped messages under increasing loss},
+]
+\addplot[color=starcolor, mark=square*, thick] coordinates {(0,0) (5,10.8) (10,22.4) (20,30.8) (30,38.2) (40,46.8)};
+\addplot[color=ringcolor, mark=triangle*, thick] coordinates {(0,0) (5,10.4) (10,18.8) (20,34) (30,40.8) (40,50.4)};
+\addplot[color=meshcolor, mark=*, thick] coordinates {(0,0) (5,6.6) (10,13.6) (20,27) (30,35.6) (40,43)};
+\addplot[color=treecolor, mark=diamond*, thick] coordinates {(0,0) (5,11) (10,21.6) (20,38.6) (30,40.4) (40,52.2)};
+\addplot[color=buscolor, mark=pentagon*, thick] coordinates {(0,0) (5,13.8) (10,20.8) (20,38.2) (30,43.4) (40,50.2)};
+\legend{Star, Ring, Mesh, Tree, Bus}
+\end{axis}
+\end{tikzpicture}
+\caption{Number of dropped messages per run as packet loss increases.}
+\label{fig:exp4_dropped}
+\end{figure}
+
+Mesh consistently drops fewer messages than the other topologies. Two effects combine here. First, Mesh has a one-hop diameter, so the survival probability per message is $(1-p)$ rather than $(1-p)^h$ for some larger $h$. Second, Mesh has more parallel paths and therefore more redundancy. Tree and Bus suffer the most, again because their diameters are largest.
+
+The election time under packet loss is summarised in Table~\ref{tab:exp4_election}.
+
+\begin{table}[H]
+\centering
+\caption{First leader election time (ticks) versus packet loss rate.}
+\label{tab:exp4_election}
+\begin{tabular}{rrrrrr}
+\toprule
+\textbf{Loss \%} & \textbf{Star} & \textbf{Ring} & \textbf{Mesh} & \textbf{Tree} & \textbf{Bus} \\
+\midrule
+0  & 199.4 & 187.0 & 185.6 & 202.2 & 194.8 \\
+5  & 201.6 & 189.0 & 186.0 & 205.2 & 199.4 \\
+10 & 202.2 & 192.6 & 186.0 & 315.0 & 268.6 \\
+20 & 354.2 & 242.0 & 186.0 & 316.0 & 357.2 \\
+30 & 424.0 & 299.8 & 183.0 & 439.0 & 267.7 \\
+40 & 436.3 & 418.2 & 386.2 & 283.5 & 200.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The interpretation is more delicate. Mesh tolerates up to 30\% packet loss without any noticeable increase in election time. Star, Ring and Bus begin to suffer at 20\%. Tree degrades at 10\% already, because the root is the choke point and even a single dropped vote at the root can derail an election. The 40\% column contains some surprisingly low values because a number of runs failed to elect any leader within the simulation window; those runs do not contribute to the election-time mean, which therefore reflects only successful elections. The takeaway is that at very high loss the metric is biased.
+
+\section{Fault Tolerance under Repeated Failures}
+
+Experiment 5 uses a seven-node cluster and three regimes. Table~\ref{tab:exp5_throughput} compares throughput across the regimes.
+
+\begin{table}[H]
+\centering
+\caption{Throughput (entries committed per 100 ticks) by regime.}
+\label{tab:exp5_throughput}
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Regime} & \textbf{Star} & \textbf{Ring} & \textbf{Mesh} & \textbf{Tree} & \textbf{Bus} \\
+\midrule
+No failure              & 3.33 & 3.33 & 3.33 & 3.33 & 3.33 \\
+Failure, no recovery    & 3.33 & 3.07 & 3.33 & 3.07 & 3.33 \\
+Failure, with recovery  & 3.33 & 3.33 & 3.33 & 3.33 & 3.33 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+In the no-failure regime every topology achieves the target throughput of 3.33 entries per 100 ticks, which corresponds to all five entries being committed within 1500 ticks. The failure-without-recovery regime is the most informative: Ring and Tree see throughput drop because they cannot route around failures effectively. Bus and Star both retain throughput, but for different reasons. In Star, the hub usually survives long enough; in Bus, the simulator records throughput based on entries that did commit, even if some runs lost the cluster halfway through.
+
+\begin{table}[H]
+\centering
+\caption{Total messages dropped under repeated failures.}
+\label{tab:exp5_dropped}
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Regime} & \textbf{Star} & \textbf{Ring} & \textbf{Mesh} & \textbf{Tree} & \textbf{Bus} \\
+\midrule
+No failure              & 0.0  & 0.0  & 0.0  & 0.0  & 0.0  \\
+Failure, no recovery    & 15.0 & 39.0 & 0.0  & 40.0 & 28.8 \\
+Failure, with recovery  & 1.0  & 0.0  & 0.0  & 4.2  & 2.8  \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    topology bar,
+    ybar=2pt,
+    bar width=8pt,
+    ylabel={Messages dropped},
+    symbolic x coords={Star, Ring, Mesh, Tree, Bus},
+    xtick=data,
+    ymin=0, ymax=50,
+    legend style={at={(0.5,-0.2)}, anchor=north, legend columns=3},
+    title={\small Dropped messages under failure regimes},
+]
+\addplot[fill=meshcolor!70] coordinates {(Star,0) (Ring,0) (Mesh,0) (Tree,0) (Bus,0)};
+\addplot[fill=buscolor!70] coordinates {(Star,15) (Ring,39) (Mesh,0) (Tree,40) (Bus,28.8)};
+\addplot[fill=treecolor!70] coordinates {(Star,1) (Ring,0) (Mesh,0) (Tree,4.2) (Bus,2.8)};
+\legend{No failure, Failure no recovery, Failure with recovery}
+\end{axis}
+\end{tikzpicture}
+\caption{Number of dropped messages under each fault regime.}
+\label{fig:exp5_dropped}
+\end{figure}
+
+The most striking result is that Mesh drops zero messages even in the failure-without-recovery regime. This is because, when a node fails, the remaining nodes still have direct edges to every other healthy node. There is no need to route through an intermediary that might be the failed one. Tree, by contrast, drops 40 messages on average, because its hierarchical routing relies on the failed node's parent or children. The pattern reverses essentially the conclusions drawn in Experiment 4: under packet loss, hop count matters most; under node failure, the number of alternative paths matters most.
+
+\section{Leader Failure Recovery}
+
+In Experiment 6 we deliberately mark the current leader as failed at tick 500 and observe how the cluster recovers. Table~\ref{tab:exp6} reports the relevant metrics.
+
+\begin{table}[H]
+\centering
+\caption{Recovery from deliberate leader failure at tick 500.}
+\label{tab:exp6}
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Metric} & \textbf{Star} & \textbf{Ring} & \textbf{Mesh} & \textbf{Tree} & \textbf{Bus} \\
+\midrule
+Re-election count            & 0.6   & 1.0   & 1.0   & 0.8   & 0.8   \\
+Re-election time (ticks)     & 232.7 & 210.4 & 195.8 & 318.5 & 281.3 \\
+Total messages sent          & 123.6 & 169.0 & 168.8 & 139.2 & 132.2 \\
+Messages dropped             & 18.0  & 0.0   & 0.0   & 12.8  & 15.8  \\
+Throughput (entries/100 ticks)& 2.80 & 3.33  & 3.33  & 3.07  & 3.07  \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The key metric is the re-election time: the number of ticks elapsed between the moment the leader fails and the moment a new leader is elected. Mesh recovers in less than 200 ticks on average. Ring is close behind, at roughly 210 ticks. Star recovers slower than expected because in some runs the leader is the hub itself, in which case the cluster is partitioned into singletons and never recovers within the run; those runs contribute a re-election count of zero, which lowers the average count and skews the time slightly. Tree and Bus take significantly longer because votes from leaves must traverse the full diameter before the candidate near the root can win a majority. Figure~\ref{fig:exp6_reelection} visualises the re-election time across the five topologies.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    topology bar,
+    ylabel={Re-election time (ticks)},
+    symbolic x coords={Star, Ring, Mesh, Tree, Bus},
+    xtick=data,
+    ymin=0, ymax=350,
+    title={\small Re-election time after deliberate leader failure at tick 500},
+]
+\addplot[fill=starcolor!70] coordinates {
+    (Star, 232.7) (Ring, 210.4) (Mesh, 195.8) (Tree, 318.5) (Bus, 281.3)
+};
+\end{axis}
+\end{tikzpicture}
+\caption{Re-election time after deliberate leader failure at tick 500. Mesh and Ring recover fastest; Tree and Bus take the longest because votes must traverse the full diameter.}
+\label{fig:exp6_reelection}
+\end{figure}
+
+The re-election count of less than one for Star, Tree and Bus is the simulator's way of saying that, in some runs, no new leader was elected within the remaining time. In Star this is the hub-failure scenario already discussed. In Tree the failed leader is sometimes the root, which has the same partitioning effect as the Star hub. In Bus the failed leader is sometimes near the centre, which fragments the chain into halves where neither half has a majority.
+
+\section{Combined Stress Test}
+
+The final experiment subjects each topology to high delay (25 ticks per hop), 15\% packet loss, 30\% node failure rate and 50\% recovery rate, on a seven-node cluster running for 2000 ticks. Table~\ref{tab:exp7} summarises the results.
+
+\begin{table}[H]
+\centering
+\caption{Combined stress test on seven-node clusters (5 runs per topology).}
+\label{tab:exp7}
+\small
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Metric} & \textbf{Star} & \textbf{Ring} & \textbf{Mesh} & \textbf{Tree} & \textbf{Bus} \\
+\midrule
+First election time (ticks)   & 632.8 & 1118.0 & 293.0 & 533.0 & 737.0 \\
+Total messages sent           & 304   & 234    & 351   & 243   & 224 \\
+Messages dropped              & 79    & 93     & 64    & 109   & 113 \\
+Election count                & 1.2   & 1.2    & 1.2   & 2.4   & 1.6 \\
+Throughput (entries/100 ticks)& 2.20  & 0.80   & 2.50  & 1.40  & 1.20 \\
+Avg.\ latency (hops)          & 1.34  & 1.84   & 1.00  & 1.86  & 2.12 \\
+Entries committed             & 4.4   & 1.6    & 5.0   & 2.8   & 2.4 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    topology bar,
+    ylabel={Throughput (entries / 100 ticks)},
+    symbolic x coords={Star, Ring, Mesh, Tree, Bus},
+    xtick=data,
+    ymin=0, ymax=3.5,
+    title={\small Throughput under combined stress conditions},
+]
+\addplot[fill=starcolor!70] coordinates {
+    (Star, 2.20) (Ring, 0.80) (Mesh, 2.50) (Tree, 1.40) (Bus, 1.20)
+};
+\end{axis}
+\end{tikzpicture}
+\caption{Throughput under the combined stress test. Mesh is the only topology that approaches its baseline throughput.}
+\label{fig:exp7_throughput}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    topology bar,
+    ylabel={Entries committed},
+    symbolic x coords={Star, Ring, Mesh, Tree, Bus},
+    xtick=data,
+    ymin=0, ymax=6,
+    title={\small Entries committed (out of 5) under combined stress},
+]
+\addplot[fill=starcolor!70] coordinates {
+    (Star, 4.4) (Ring, 1.6) (Mesh, 5.0) (Tree, 2.8) (Bus, 2.4)
+};
+\end{axis}
+\end{tikzpicture}
+\caption{Entries committed under combined stress, out of five attempted.}
+\label{fig:exp7_entries}
+\end{figure}
+
+The combined stress test is the most discriminating of the seven experiments. Only Mesh commits all five entries; it also has the fastest leader election (293 ticks on average). Star manages 4.4 entries on average, which means most runs succeeded. Tree, Bus and especially Ring do badly: Ring commits an average of 1.6 entries out of five, that is, less than a third of the workload. The election time for Ring of 1118 ticks indicates that the cluster spent most of the simulation in failed elections.
+
+The Tree topology shows the highest election count (2.4 on average), which indicates instability: leaders keep failing and the cluster keeps re-electing. The combination of root-as-bottleneck and 30\% node failure produces a regime in which the leader is repeatedly partitioned from a quorum.
+
+\section{Cross-Experiment Synthesis}
+
+The seven experiments tell a coherent story.
+
+\begin{itemize}
+    \item In benign conditions every topology works well; differences are essentially noise.
+    \item As scale, delay or loss grow, topologies divide into a clear hierarchy: Mesh, then Star and Tree, then Ring, then Bus.
+    \item Under failures, the hierarchy is reordered: Mesh is still best, but the rest depend on whether the structurally critical node fails.
+    \item Under combined stress, only Mesh remains usable for production; the others fail in different ways.
+\end{itemize}
+
+The detailed interpretation of these findings, and their practical implications, is the subject of the next chapter.
+

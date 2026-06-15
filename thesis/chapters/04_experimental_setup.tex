@@ -1,0 +1,113 @@
+\chapter{Experimental Setup}
+\label{ch:experiments}
+
+This chapter describes the experiments performed in this work. We designed the experiment suite around the four research questions stated in Chapter~\ref{ch:introduction}: the effect of topology on leader election time, the effect on message overhead, the response to failures, and the trade-off between performance and fault tolerance under realistic conditions. Each experiment isolates one independent variable and holds the others constant. Together the seven experiments span the parameter space relevant to typical Raft deployments.
+
+\section{Common Parameters}
+
+Every experiment uses the same simulator (Chapter~\ref{ch:methodology}) and the same set of five topologies. Unless an experiment varies the parameter explicitly, the following defaults apply.
+
+\begin{table}[H]
+\centering
+\caption{Common simulation parameters.}
+\label{tab:common_params}
+\begin{tabular}{ll}
+\toprule
+\textbf{Parameter} & \textbf{Default} \\
+\midrule
+Cluster size               & 5 nodes \\
+Simulation duration        & 1000 ticks \\
+Per-hop message delay      & 10 ticks \\
+Packet loss rate           & 0\% \\
+Node failure probability   & 0\% \\
+Node recovery probability  & 0\% \\
+Number of log entries to replicate & 5 \\
+Election timeout range     & 150--300 ticks \\
+Heartbeat interval         & 50 ticks \\
+Random seeds (run $i$)     & $42 + i$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The number of repetitions per scenario is ten for the baseline experiment and five for the others. We chose these numbers as a compromise between statistical power and total compute time. Where standard deviations are large we discuss the implication explicitly.
+
+\section{Experiment 1: Baseline Comparison}
+\label{sec:exp1}
+
+The baseline experiment asks the simplest possible question: when the network is well-behaved (no packet loss, no failures, moderate delay), does the choice of topology matter? It executes a five-node cluster on each of the five topologies and replicates five log entries.
+
+\textbf{Independent variable:} topology.\\
+\textbf{Dependent variables:} all metrics defined in Chapter~\ref{ch:methodology}.\\
+\textbf{Repetitions:} 10 per topology.\\
+\textbf{Hypothesis:} we expect the differences among topologies to be modest in this benign regime, with Mesh achieving the lowest average latency by virtue of being one hop end-to-end.
+
+\section{Experiment 2: Cluster Size Scalability}
+\label{sec:exp2}
+
+Larger clusters are more fault tolerant but require more communication. This experiment measures how each topology scales as the cluster grows. Cluster sizes of 3, 5, 7, 9, 11 and 13 nodes are tested. Odd sizes are used because Raft favours odd cluster sizes to avoid quorum ties.
+
+\textbf{Independent variables:} topology, cluster size.\\
+\textbf{Dependent variables:} first leader election time, total messages sent, average latency in hops, throughput.\\
+\textbf{Repetitions:} 5 per (topology, size) pair.\\
+\textbf{Hypothesis:} we expect Star, Tree and Mesh to scale gracefully, while Ring and Bus should show linear or worse degradation in latency and election time.
+
+\section{Experiment 3: Message Delay Sensitivity}
+\label{sec:exp3}
+
+Real networks have widely varying latencies. A Raft cluster spread across a single rack experiences microsecond delays, while one spanning continents can have hundreds of milliseconds of latency. This experiment varies the per-hop message delay from 2 to 50 ticks and measures how each topology copes.
+
+\textbf{Independent variables:} topology, per-hop delay.\\
+\textbf{Dependent variables:} first leader election time, average latency in ticks, throughput.\\
+\textbf{Repetitions:} 5 per (topology, delay) pair.\\
+\textbf{Hypothesis:} delay should scale linearly with topology diameter; Mesh is expected to be the least sensitive.
+
+\section{Experiment 4: Packet Loss Sensitivity}
+\label{sec:exp4}
+
+Packet loss is the second main impairment in real networks. We vary the per-hop loss rate from 0\% to 40\%, in steps. Forty percent is unrealistically high for a healthy network, but it lets us probe the regime in which Raft is forced to retry RPCs aggressively.
+
+\textbf{Independent variables:} topology, packet loss rate.\\
+\textbf{Dependent variables:} first leader election time, total messages dropped, election count.\\
+\textbf{Repetitions:} 5 per (topology, loss rate) pair.\\
+\textbf{Hypothesis:} topologies with longer paths suffer more from per-hop loss because the survival probability decays exponentially with hop count.
+
+\section{Experiment 5: Fault Tolerance under Repeated Failures}
+\label{sec:exp5}
+
+This experiment goes beyond the previous ones by looking at how the cluster behaves when nodes can fail and recover throughout the run. We compare three regimes on a seven-node cluster.
+
+\begin{itemize}
+    \item \textbf{No failure:} all nodes remain healthy. This is a sanity check.
+    \item \textbf{Failure without recovery:} every tick, each healthy node has a 50\% probability of failing; failed nodes never recover.
+    \item \textbf{Failure with recovery:} every tick each healthy node has a 50\% probability of failing; failed nodes have an 80\% probability of recovering per tick.
+\end{itemize}
+
+\textbf{Independent variables:} topology, failure regime.\\
+\textbf{Dependent variables:} throughput, election count, total messages sent, total messages dropped, entries committed.\\
+\textbf{Repetitions:} 5 per (topology, regime) pair.\\
+\textbf{Hypothesis:} topologies with structurally critical nodes (Star hub, Tree root) should suffer disproportionately when those nodes fail; Mesh should be the most resilient.
+
+\section{Experiment 6: Leader Failure Recovery}
+\label{sec:exp6}
+
+A real Raft deployment will, sooner or later, lose its leader. The cluster must then re-elect a new leader, and the time required to do so is the dominant component of perceived downtime. This experiment forces the current leader to fail at tick 500 and measures how quickly each topology re-elects.
+
+\textbf{Independent variable:} topology.\\
+\textbf{Dependent variables:} re-election time (ticks elapsed between leader failure and election of a new leader), re-election count, throughput, message count.\\
+\textbf{Repetitions:} 5 per topology.\\
+\textbf{Hypothesis:} Mesh should re-elect fastest because the candidates can reach all voters in a single hop. Star should also be fast provided the hub is not the leader; if the leader happens to be the hub, the cluster is partitioned and re-election is impossible.
+
+\section{Experiment 7: Combined Stress Test}
+\label{sec:exp7}
+
+The final experiment combines all impairments simultaneously: high message delay (25 ticks per hop), 15\% packet loss, 30\% node failure probability with 50\% recovery probability, on a seven-node cluster running for 2000 ticks. The aim is to characterise behaviour under genuinely adversarial conditions.
+
+\textbf{Independent variable:} topology.\\
+\textbf{Dependent variables:} all metrics.\\
+\textbf{Repetitions:} 5 per topology.\\
+\textbf{Hypothesis:} we expect the differences observed in the previous experiments to compound. Mesh should remain functional; Bus and Ring should struggle to elect a stable leader; Star and Tree should sit somewhere in between.
+
+\section{Reproducibility}
+
+All scripts used to launch the experiments and to aggregate the results are stored in the project repository under \texttt{thesis/run\_experiments.py}. The aggregated data is checkpointed in \texttt{experiment\_data.json}. Each scenario uses an explicit base seed of 42, with run $i$ using seed $42 + i$.
+

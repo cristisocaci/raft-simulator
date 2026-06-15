@@ -1,0 +1,84 @@
+\chapter{Discussion}
+\label{ch:discussion}
+
+The previous chapter presented the raw experimental results. This chapter interprets them. We discuss the practical implications of the findings, place them in the context of the existing literature, examine the threats to validity that affect any simulation study and suggest how the present work could be extended.
+
+\section{Interpreting the Topology Hierarchy}
+
+The most consistent finding across all seven experiments is the relative ordering of the five topologies. Mesh is uniformly the best performer; Bus is uniformly the worst. The order of the others depends on the specific stress applied, but in aggregate it is Star, Tree, Ring, Bus. Two structural properties account for almost all of this variance: the diameter of the topology and the connectivity of the graph.
+
+Diameter dominates when the stress is latency-related. Whether the latency is induced by per-hop delay (Experiment 3), by long paths in large clusters (Experiment 2) or by a combination thereof (Experiment 7), the topologies with smaller diameters elect faster, commit faster and tolerate more delay. Mesh has constant diameter one. Star has diameter two. Tree, Ring and Bus all have diameters that grow with $n$, and their relative growth rates explain their relative performance.
+
+Connectivity dominates when the stress is failure-related. A graph's connectivity is the minimum number of nodes whose removal disconnects it. Mesh has connectivity $n-1$, meaning all but one node would have to fail before the graph fragments. Star, Tree and Bus all have connectivity one: removing the hub, the root or a middle node respectively partitions the network. Ring has connectivity two. This translates directly into the failure tolerance observed in Experiments 5 and 6.
+
+The two properties combine multiplicatively in Experiment 7, where Mesh's small diameter and high connectivity together explain why it is the only topology that maintains its baseline behaviour under combined stress.
+
+\section{Practical Implications}
+
+The results lead to several recommendations for engineers deploying Raft-based systems on top of a chosen network architecture. These recommendations are not new in spirit, but the experimental data quantifies them.
+
+\subsection{Cluster Size}
+
+A common rule of thumb is that Raft clusters should have an odd number of nodes between three and seven. Our results support this guideline strongly. Below three nodes, there is no quorum tolerance to a single failure. Above seven nodes, latency penalties begin to appear in any topology other than Mesh. At thirteen nodes on a Bus topology, the leader election time triples relative to the same workload at five nodes. If a deployment needs more than seven nodes for scalability reasons, it should either use a Mesh substrate or accept that election time will become its bottleneck.
+
+\subsection{Election Timeouts}
+
+The default election timeout range of 150--300 ticks is appropriate when the maximum round-trip time is significantly less than 150 ticks. Experiment 3 shows that at 50 ticks per hop on a Tree topology, the round trip across the diameter exceeds 200 ticks, which destabilises the algorithm. Production deployments should size the lower bound of the election timeout to be at least three or four times the worst-case round-trip time across the network. Where this is not feasible, the deployment should be limited to topologies of small diameter.
+
+\subsection{Topology Selection}
+
+For most production deployments, the practical choice is not between five exotic topologies but between a fully connected overlay (logical Mesh) and whatever the underlying physical network provides. The data suggests that, when feasible, a logical Mesh of TCP connections gives the best performance per node added. Star is acceptable if the hub is reliable; Tree is acceptable if the root is reliable; Ring and Bus should be avoided unless cost or physical constraints make them unavoidable. In edge or industrial contexts where Bus is the only physical option, the cluster should be kept small and the timeouts loosened.
+
+\subsection{Anticipating Critical-Node Failure}
+
+The single most damaging failure mode we observed was the loss of a structurally critical node. In Star, the hub. In Tree, the root. In Bus, any internal node. Because Raft cannot distinguish between a real failure and a network partition, the cluster simply stalls. The mitigation is not in the algorithm but in the network design: structurally critical nodes should be replicated at the network layer (for example, by using multiple physical links to a virtual hub), so that what looks like a single critical node is in fact several. This raises the connectivity of the graph and brings its behaviour closer to a Mesh.
+
+\section{Comparison with Theoretical Bounds}
+
+Several of the observed quantities can be compared with their theoretical counterparts.
+
+\textbf{Election time.} In a synchronous network, the lower bound on leader election in Raft is one round trip across the diameter, plus the randomised election timeout. With a default lower bound of 150 ticks and a per-hop delay of 2 ticks, this gives a theoretical floor of $150 + 2 \cdot D \cdot 2$ ticks. For Mesh ($D=1$) this is 154 ticks; for a five-node Bus ($D=4$) it is 166 ticks. The observed means of 169.6 ticks for Mesh and 172.0 ticks for Bus at delay 2 (Table~\ref{tab:exp3_election}) are consistent with these bounds.
+
+\textbf{Message overhead.} The number of messages required to elect a leader is at most $2(n-1)$ \texttt{RequestVote} round trips, that is, $4(n-1)$ messages in total. For a five-node cluster this gives sixteen messages of election traffic. Our observed counts (Table~\ref{tab:exp1_baseline}) are dominated by the heartbeat and replication traffic, which is several times larger; the fraction attributable to elections is consistent with the bound.
+
+\textbf{Throughput.} The maximum throughput is bounded by $1 / (2 \cdot D \cdot d)$ entries per tick, where $d$ is the per-hop delay, because each entry requires at least one round trip to be committed. For Mesh at the default delay, this gives a ceiling of $1/20 = 0.05$ entries per tick, that is, five entries per 100 ticks, which matches our observed throughput exactly. For Bus at five nodes the ceiling is $1/80 = 0.0125$ entries per tick, that is, 1.25 per 100 ticks. The fact that we observe higher throughput in the baseline experiment is because the simulator pipelines log replication: an entry can be appended to followers' logs while the previous entry is still being acknowledged. This pipelining is consistent with the original Raft specification and with production implementations.
+
+\section{Threats to Validity}
+\label{sec:limitations}
+
+Any simulation study must articulate the gap between the model and the reality it abstracts. We discuss four categories of threat.
+
+\subsection{Internal Validity}
+
+Internal validity concerns whether the simulator faithfully models Raft. We took several steps to maximise internal validity: we implemented the algorithm directly from the original paper, we validated that single-node failure and leader partition produced the expected behaviour, and we used random seeds to ensure reproducibility. Nevertheless, the simulator does not implement every optimisation found in production Raft (for example, batching, snapshotting, pre-vote, leadership transfer). Optimisations that reduce message count or election time would improve all topologies similarly, but their interaction with topology has not been measured.
+
+\subsection{External Validity}
+
+External validity concerns whether the conclusions generalise to real systems. Our simulator models the network as a graph with constant per-hop delay and uniform per-hop loss. Real networks have heterogeneous link capacities, queueing effects, congestion control and bursty failure patterns. Our results should be read as upper bounds on the topology effect: in a real network, additional sources of variance would dilute the signal somewhat. However, the relative ordering of topologies is so consistent across our experiments that we expect it to survive in the real world.
+
+\subsection{Construct Validity}
+
+Construct validity concerns whether the metrics we measure correspond to what they are supposed to capture. The first leader election time is straightforward. Throughput is defined as committed entries per 100 ticks, which corresponds to the user-visible work rate. Average latency in ticks is the mean delivery delay of all RPCs; this is sensible at the message level but does not capture user-visible latency, which is the time from request submission to response. The two are related but not identical, and a future extension of the work could trace each request explicitly.
+
+\subsection{Statistical Validity}
+
+We use five repetitions for most scenarios and ten for the baseline. This is enough to estimate means with reasonable confidence but is too few for tight confidence intervals on the standard deviations themselves. The standard deviations reported in the tables are sample standard deviations, not estimates of the population standard deviation. Where the standard deviation approaches the mean, the result should be read with caution. We highlighted such cases in the text where they arose.
+
+\section{Comparison with Existing Studies}
+
+The findings here are largely consistent with the broader literature on consensus performance, but they extend that literature in two directions. First, most prior studies hold the network constant and vary the algorithm. Examples include \citet{howard2020}, who compare several Paxos variants on identical hardware, and \citet{wang2017}, who measure the effect of pipelining log replication. Our work does the opposite: we hold the algorithm constant and vary the topology. The two studies are complementary and could be combined in a future evaluation that varies both axes.
+
+Second, our work makes the topology effect visible in absolute terms. The original Raft paper acknowledges that network conditions affect performance but does not quantify the effect by topology. The data presented here gives engineers numerical anchors against which they can size their own deployments.
+
+The closest related work is the simulation by \citet{larrea2018}, which examines leader election in unreliable networks but does not vary the topology. Our findings on packet loss (Experiment 4) align with their observation that loss disproportionately affects topologies with longer paths.
+
+\section{Threats Specific to the Tree and Bus Results}
+
+Two of our findings deserve particular scrutiny because they may be affected by simulator artefacts.
+
+The Tree result at packet loss 40\% (Table~\ref{tab:exp4_election}) shows an apparently lower election time than at lower loss. This is because at extreme loss many runs failed to elect any leader within the simulation window, and the metric averages only successful elections. The same effect is responsible for the apparently low Bus election time in the same row. We have flagged these cases explicitly in Chapter~\ref{ch:results} and emphasise here that the right interpretation is "many runs failed entirely", not "the topology improved".
+
+The Tree result in Experiment 7 (election count 2.4) is also worth noting. At seven nodes the binary tree has a root with two children and four grandchildren. If the root or one of its children fails, the topology often lacks a quorum of healthy nodes that can communicate. The simulator's failure model allows recovery, but the time scales of failure (per-tick stochastic) and recovery (also per-tick stochastic with probability 0.5) mean that the cluster spends a non-trivial fraction of the simulation in a degraded state. A more realistic failure model with longer mean time between failures would mitigate this effect.
+
+The limitations identified above point directly to a number of extensions; these are discussed together with the thesis's other future directions in Section~\ref{sec:future_work}.
+

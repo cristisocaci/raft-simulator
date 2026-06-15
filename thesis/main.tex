@@ -1,0 +1,222 @@
+\documentclass[12pt, a4paper, oneside]{report}
+
+% Encoding and language
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+
+% Times New Roman font
+\usepackage{mathptmx}
+
+% Margins per FSEGA guide (2.54cm on all sides)
+\usepackage[top=2.54cm, bottom=2.54cm, left=2.54cm, right=2.54cm]{geometry}
+
+% 1.5 line spacing
+\usepackage{setspace}
+\onehalfspacing
+
+% Graphics and plots
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{subcaption}
+
+% Tables
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{tabularx}
+
+% Math
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+% Code listings
+\usepackage{listings}
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    numbers=left,
+    numberstyle=\tiny,
+    tabsize=2
+}
+
+% Tikz for topology diagrams
+\usepackage{tikz}
+\usetikzlibrary{positioning, calc}
+
+% Hyperlinks
+\usepackage[hidelinks]{hyperref}
+
+% Bibliography (author-year format per FSEGA guide)
+\usepackage[authoryear,round]{natbib}
+\bibpunct{(}{)}{;}{a}{,}{,}
+
+% Captions
+\usepackage{caption}
+\captionsetup{font=small, labelfont=bf}
+
+% Custom colors for plots
+\definecolor{starcolor}{HTML}{0033CC}
+\definecolor{ringcolor}{HTML}{F59E0B}
+\definecolor{meshcolor}{HTML}{09090B}
+\definecolor{treecolor}{HTML}{10B981}
+\definecolor{buscolor}{HTML}{EF4444}
+
+% Chapter formatting per FSEGA guide
+\usepackage{titlesec}
+\titleformat{\chapter}[display]
+    {\normalfont\fontsize{14}{16}\bfseries}
+    {\MakeUppercase{\chaptertitlename}\ \thechapter}{12pt}
+    {\fontsize{14}{16}\bfseries}
+\titleformat{name=\chapter,numberless}[display]
+    {\normalfont\fontsize{14}{16}\bfseries}
+    {}{0pt}
+    {\fontsize{14}{16}\bfseries}
+\titlespacing*{\chapter}{0pt}{12pt}{12pt}
+\titlespacing*{name=\chapter,numberless}{0pt}{12pt}{12pt}
+\titleformat{\section}
+    {\normalfont\fontsize{13}{15}\bfseries}
+    {\thesection}{1em}{}
+\titlespacing*{\section}{0pt}{12pt}{12pt}
+\titleformat{\subsection}
+    {\normalfont\fontsize{12}{14}\itshape\centering}
+    {\thesubsection}{1em}{}
+\titlespacing*{\subsection}{0pt}{12pt}{12pt}
+
+% Paragraph spacing per FSEGA guide (1cm first-line indent, no extra
+% spacing between paragraphs; LaTeX already suppresses the indent on the
+% paragraph immediately following a chapter/section heading)
+\setlength{\parindent}{1cm}
+\setlength{\parskip}{0pt}
+
+% pgfplots bar chart style
+\pgfplotsset{
+    topology bar/.style={
+        ybar,
+        bar width=10pt,
+        enlarge x limits=0.15,
+        ylabel style={font=\small},
+        xlabel style={font=\small},
+        tick label style={font=\footnotesize},
+        legend style={font=\footnotesize, at={(0.5,-0.25)}, anchor=north, legend columns=-1},
+        nodes near coords,
+        nodes near coords style={font=\tiny},
+        every node near coord/.append style={rotate=90, anchor=west},
+        width=0.95\textwidth,
+        height=7cm,
+    },
+    topology line/.style={
+        width=0.95\textwidth,
+        height=7cm,
+        ylabel style={font=\small},
+        xlabel style={font=\small},
+        tick label style={font=\footnotesize},
+        legend style={font=\footnotesize, at={(0.5,-0.25)}, anchor=north, legend columns=-1},
+        grid=major,
+        grid style={dashed, gray!30},
+        mark size=2pt,
+    }
+}
+
+\begin{document}
+
+% Title page
+\begin{titlepage}
+    \centering
+    \vspace*{1cm}
+
+    {\large BABE\c{S}-BOLYAI UNIVERSITY}\\[0.3cm]
+    {\large FACULTY OF ECONOMICS AND BUSINESS ADMINISTRATION}\\[0.3cm]
+    {\large Cluj-Napoca}\\[0.5cm]
+    {\large Master's Programme: Business Modelling and Distributed Computing}
+
+    \vspace{3cm}
+
+    {\Large \textbf{MASTER'S THESIS}}
+
+    \vspace{1.5cm}
+
+    {\LARGE \textbf{THE INFLUENCE OF NETWORK TOPOLOGIES ON THE RAFT CONSENSUS ALGORITHM: A SIMULATION-BASED ANALYSIS}}
+
+    \vspace{3cm}
+
+    \begin{minipage}{0.45\textwidth}
+        \begin{flushleft}
+            \textbf{Scientific supervisor:}\\
+            Lect.~univ.~dr.~Stan Alexandru
+        \end{flushleft}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.45\textwidth}
+        \begin{flushright}
+            \textbf{Student:}\\
+            Socaci Marius-Cristian
+        \end{flushright}
+    \end{minipage}
+
+    \vfill
+    {\large 2026}
+\end{titlepage}
+
+% Table of Contents
+\pagenumbering{roman}
+
+% Abstract
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+
+\noindent This thesis investigates how network topology shapes the behaviour of the Raft consensus algorithm, addressing a gap in the literature, which typically assumes a fully connected or abstracted network. We built a discrete-event simulation framework in Python implementing the core Raft state machine within five canonical topologies (Star, Ring, Mesh, Tree, Bus), with shortest-path routing, configurable delay and packet loss, node failures and recoveries, and reproducible seeded runs, accessible via a React/FastAPI web dashboard. Seven experimental campaigns examined baseline performance, scalability, sensitivity to delay and packet loss, fault tolerance, leader-failure recovery, and combined stress, each repeated five to ten times. Results reveal a consistent ordering: Mesh achieves the lowest latency, most predictable elections and strongest resilience to packet loss; Star and Tree degrade abruptly once faults strike their critical nodes; Ring and Bus scale poorly as path length grows, and under combined stress only Mesh sustains the target throughput.
+
+\textbf{Keywords:} Raft, consensus, distributed systems, network topology, simulation, fault tolerance, leader election, replicated state machine, performance evaluation.
+
+\newpage
+
+\tableofcontents
+\newpage
+
+% List of Tables
+\listoftables
+\newpage
+
+% List of Figures
+\listoffigures
+\newpage
+
+% List of Abbreviations
+\chapter*{List of Abbreviations}
+\addcontentsline{toc}{chapter}{List of Abbreviations}
+
+\begin{tabular}{ll}
+API & Application Programming Interface \\
+JSON & JavaScript Object Notation \\
+LAN & Local Area Network \\
+REST & Representational State Transfer \\
+RPC & Remote Procedure Call \\
+\end{tabular}
+
+\newpage
+
+% Start main content
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+\input{chapters/01_introduction}
+\input{chapters/02_background}
+\input{chapters/03_methodology}
+\input{chapters/04_experimental_setup}
+\input{chapters/05_results}
+\input{chapters/06_discussion}
+\input{chapters/07_conclusions}
+
+% Bibliography (TNR 11pt, 1cm hanging indent per FSEGA guide)
+\setlength{\bibhang}{1cm}
+{\small
+\bibliographystyle{apalike}
+\bibliography{references}
+}
+
+\end{document}

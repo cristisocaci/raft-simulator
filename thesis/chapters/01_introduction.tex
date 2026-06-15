@@ -1,0 +1,40 @@
+\chapter{Introduction}
+\label{ch:introduction}
+
+Distributed systems form the backbone of modern computing infrastructure. From cloud platforms serving billions of users to financial trading systems processing millions of transactions per second, these systems depend on the ability of multiple independent nodes to coordinate and agree on a shared state. The mechanism that enables this coordination is known as consensus, and it remains one of the most studied problems in distributed computing.
+
+The Raft consensus algorithm, proposed by \citet{ongaro2014}, was designed as a more understandable alternative to Paxos \citep{lamport1998}. Since its publication, Raft has seen widespread adoption in production systems including etcd \citep{etcd2024}, CockroachDB \citep{cockroachdb2024}, and HashiCorp Consul \citep{consul2024}. Its decomposition into leader election, log replication, and safety makes it both practical to implement and amenable to formal analysis.
+
+While the correctness properties of Raft have been extensively studied, its performance characteristics under varying network conditions have received less systematic treatment. In particular, the relationship between the underlying network topology and the algorithm's behaviour presents an open area for investigation. Real-world deployments rarely operate on fully connected networks. Data centres use hierarchical tree-like structures. Wide-area networks may impose star or ring configurations. Edge computing environments may rely on bus-like topologies. Each of these imposes different constraints on message latency, path redundancy, and fault tolerance.
+
+\section{Motivation}
+
+The motivation for this work is twofold. First, existing literature on Raft performance tends to assume either a fully connected network or abstract away the network layer entirely. This leaves a gap in understanding how realistic network constraints affect consensus behaviour. Second, practitioners deploying Raft-based systems must make infrastructure decisions about network design, and currently lack quantitative guidance on how topology choice impacts consensus performance.
+
+Consider a distributed database deployed across five data centres. If the network connecting these centres follows a star topology with a central hub, the failure of that hub partitions the entire cluster. If it follows a mesh topology, any single link failure leaves all nodes reachable through alternative paths. These architectural differences directly affect leader election times, message overhead, and the system's ability to maintain consensus under failures.
+
+\section{Research Objectives}
+
+This thesis investigates the following research questions:
+
+\begin{enumerate}
+    \item How does network topology affect leader election time in the Raft consensus algorithm?
+    \item What is the relationship between topology structure and message overhead during steady-state operation?
+    \item How do different topologies respond to node failures and network degradation?
+    \item Which topologies provide the best trade-offs between performance and fault tolerance under realistic conditions?
+\end{enumerate}
+
+To answer these questions, we developed a discrete-event simulation framework that implements the core Raft protocol and models five common network topologies: Star, Ring, Mesh (fully connected), Tree (binary hierarchy), and Bus (linear chain). We conducted seven experimental campaigns covering baseline performance, scalability with cluster size, sensitivity to message delay and packet loss, fault tolerance behaviour, leader failure recovery, and combined stress conditions.
+
+\section{Methodology Overview}
+
+Our approach is simulation-based. We implemented a tick-driven simulation engine in Python that models the Raft state machine for each node, computes shortest-path routing through the topology graph, and applies configurable message delays and packet loss per hop. Each experiment was repeated multiple times with different random seeds to obtain statistically meaningful results.
+
+The simulation captures the following metrics at each run: leader election time, total messages sent, average message latency (in both hops and ticks), convergence time, message drop rate, log replication throughput, and election count. These metrics are aggregated across runs using standard statistical measures (mean, standard deviation, minimum, maximum).
+
+\section{Thesis Structure}
+
+The remainder of this thesis is organised as follows.
+
+Chapter~\ref{ch:background} presents the theoretical background, covering distributed consensus, the Raft algorithm, and network topology theory. Chapter~\ref{ch:methodology} describes the simulation framework, its architecture, and implementation details. Chapter~\ref{ch:experiments} defines the experimental setup, including scenarios, parameters, and metrics. Chapter~\ref{ch:results} presents the experimental results with quantitative analysis. Chapter~\ref{ch:discussion} interprets the findings, discusses their implications, and acknowledges limitations. Chapter~\ref{ch:conclusions} summarises the contributions and suggests directions for future work.
+

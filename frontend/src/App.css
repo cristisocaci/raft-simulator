@@ -1,0 +1,73 @@
+@keyframes dash-flow {
+    to {
+        stroke-dashoffset: -12;
+    }
+}
+
+.animate-dash {
+    animation: dash-flow 0.5s linear infinite;
+}
+
+@keyframes pulse-node {
+    0%, 100% { r: 20; }
+    50% { r: 23; }
+}
+
+.leader-pulse {
+    animation: pulse-node 1.5s ease-in-out infinite;
+}
+
+@keyframes fade-in-up {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-fade-in {
+    animation: fade-in-up 0.3s ease-out forwards;
+}
+
+.font-chivo {
+    font-family: 'Chivo', sans-serif;
+}
+
+.font-plex {
+    font-family: 'IBM Plex Sans', sans-serif;
+}
+
+.font-mono {
+    font-family: 'IBM Plex Mono', monospace;
+}
+
+/* Recharts overrides */
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+    stroke: #E4E4E7;
+}
+
+.recharts-text {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 4px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #D4D4D8;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #A1A1AA;
+}
