@@ -2,6 +2,7 @@ import "@/App.css";
 import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom";
 import Dashboard from "@/pages/Dashboard";
 import ComparisonPage from "@/pages/ComparisonPage";
+import SweepPage from "@/pages/SweepPage";
 import HistoryPage from "@/pages/HistoryPage";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -17,6 +18,7 @@ function App() {
             {[
               { to: "/", label: "Simulation", id: "nav-simulation", end: true },
               { to: "/compare", label: "Comparison", id: "nav-comparison" },
+              { to: "/sweep", label: "Sweep", id: "nav-sweep" },
               { to: "/history", label: "History", id: "nav-history" },
             ].map((link) => (
               <NavLink
@@ -40,6 +42,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/compare" element={<ComparisonPage />} />
+          <Route path="/sweep" element={<SweepPage />} />
           <Route path="/history" element={<HistoryPage />} />
         </Routes>
       </BrowserRouter>

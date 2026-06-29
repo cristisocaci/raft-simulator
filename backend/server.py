@@ -7,7 +7,7 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 import uuid
 import statistics as pystats
 from datetime import datetime, timezone
@@ -88,6 +88,20 @@ class StatisticalRequest(BaseModel):
     log_entries: int = 5
     base_seed: int = 42
     runs: int = 10
+
+
+class SweepRequest(BaseModel):
+    sweep_param: str
+    sweep_values: List[float]
+    num_nodes: int = 5
+    message_delay: int = 10
+    packet_loss: float = 0.0
+    node_failure_prob: float = 0.0
+    node_recovery_prob: float = 0.0
+    max_ticks: int = 1000
+    log_entries: int = 5
+    base_seed: int = 42
+    runs: int = 5
 
 
 @api_router.get("/")
@@ -241,6 +255,82 @@ async def run_statistical(req: StatisticalRequest):
             "node_recovery_prob": req.node_recovery_prob,
             "max_ticks": req.max_ticks,
             "runs": req.runs,
+        },
+    }
+
+
+@api_router.post("/simulations/sweep")
+async def run_sweep(req: SweepRequest):
+    valid_params = {"packet_loss", "message_delay", "num_nodes", "node_failure_prob", "node_recovery_prob"}
+    if req.sweep_param not in valid_params:
+        raise HTTPException(status_code=422, detail=f"Invalid sweep_param. Must be one of: {', '.join(sorted(valid_params))}")
+    if not req.sweep_values:
+        raise HTTPException(status_code=422, detail="sweep_values must not be empty")
+
+    topologies = ["star", "ring", "mesh", "tree", "bus"]
+    metric_keys = [
+        "first_leader_election_time", "total_messages_sent", "total_messages_received",
+        "total_messages_dropped", "election_count", "convergence_time",
+        "throughput", "avg_latency_hops", "avg_latency_ticks", "entries_committed",
+    ]
+    sweep_results = []
+
+    for sweep_val in req.sweep_values:
+        topo_results = {}
+        for topo in topologies:
+            run_metrics = []
+            for i in range(req.runs):
+                config = {
+                    "message_delay": req.message_delay,
+                    "packet_loss": req.packet_loss,
+                    "node_failure_prob": req.node_failure_prob,
+                    "node_recovery_prob": req.node_recovery_prob,
+                    "max_ticks": req.max_ticks,
+                    "log_entries": req.log_entries,
+                    "seed": req.base_seed + i,
+                }
+                num_nodes = req.num_nodes
+                if req.sweep_param == "num_nodes":
+                    num_nodes = max(3, int(round(sweep_val)))
+                else:
+                    config[req.sweep_param] = sweep_val
+
+                engine = SimulationEngine(topo, num_nodes, config)
+                result = engine.run()
+                run_metrics.append(result["metrics"])
+
+            aggregated = {}
+            for key in metric_keys:
+                values = [r.get(key) for r in run_metrics if r.get(key) is not None]
+                if values:
+                    mean_val = pystats.mean(values)
+                    std_val = pystats.stdev(values) if len(values) > 1 else 0
+                    aggregated[key] = {
+                        "mean": round(mean_val, 2),
+                        "std": round(std_val, 2),
+                        "min": round(min(values), 2),
+                        "max": round(max(values), 2),
+                    }
+                else:
+                    aggregated[key] = {"mean": 0, "std": 0, "min": 0, "max": 0}
+
+            topo_results[topo] = {"aggregated": aggregated, "num_runs": req.runs}
+
+        sweep_results.append({"value": sweep_val, "topologies": topo_results})
+
+    return {
+        "sweep_param": req.sweep_param,
+        "sweep_values": req.sweep_values,
+        "results": sweep_results,
+        "config": {
+            "num_nodes": req.num_nodes,
+            "message_delay": req.message_delay,
+            "packet_loss": req.packet_loss,
+            "node_failure_prob": req.node_failure_prob,
+            "node_recovery_prob": req.node_recovery_prob,
+            "max_ticks": req.max_ticks,
+            "runs": req.runs,
+            "base_seed": req.base_seed,
         },
     }
 

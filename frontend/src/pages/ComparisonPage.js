@@ -7,7 +7,8 @@ import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Download, BarChart3 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Loader2, Download, BarChart3, ChevronDown, ChevronUp } from "lucide-react";
 import ComparisonCharts from "@/components/ComparisonCharts";
 import { exportComparisonCSV, exportStatisticalCSV } from "@/utils/csvExport";
 
@@ -25,11 +26,14 @@ export default function ComparisonPage() {
     log_entries: 5,
     seed: 42,
     runs: 1,
+    inject_leader_failure_at: null,
   });
   const [results, setResults] = useState(null);
   const [statResults, setStatResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState("single"); // "single" or "statistical"
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [leaderFailure, setLeaderFailure] = useState(false);
 
   // Replay from history
   useEffect(() => {
@@ -83,6 +87,7 @@ export default function ComparisonPage() {
           max_ticks: config.max_ticks,
           log_entries: config.log_entries,
           seed: config.seed,
+          inject_leader_failure_at: config.inject_leader_failure_at,
         });
         setResults(res.data.results);
         toast.success("Comparison complete");
@@ -230,6 +235,16 @@ export default function ComparisonPage() {
               </Badge>
             )}
 
+            <Button
+              variant="ghost"
+              size="sm"
+              className="rounded-none text-xs text-zinc-500 gap-1 hover:text-zinc-900"
+              onClick={() => setShowAdvanced((v) => !v)}
+            >
+              {showAdvanced ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              Advanced
+            </Button>
+
             <div className="flex items-center gap-2 ml-auto">
               {hasResults && (
                 <Button
@@ -263,6 +278,82 @@ export default function ComparisonPage() {
           </div>
         </div>
       </div>
+
+      {/* Advanced section */}
+      {showAdvanced && (
+        <div className="border-b border-zinc-900 px-6 py-4 bg-zinc-50">
+          <div className="flex items-end gap-6 flex-wrap">
+            <p className="text-[10px] uppercase tracking-wider text-zinc-400 font-medium min-w-[60px]">
+              Advanced
+            </p>
+
+            <div className="flex items-center gap-2">
+              <Label className="text-[10px] uppercase tracking-wider text-zinc-500">
+                Seed
+              </Label>
+              <input
+                type="number"
+                value={config.seed}
+                onChange={(e) => updateConfig("seed", parseInt(e.target.value, 10) || 0)}
+                className="rounded-none border border-zinc-300 w-20 h-7 text-xs font-mono px-2 focus:outline-none focus:border-zinc-900"
+                data-testid="compare-seed-input"
+              />
+            </div>
+
+            <div className="w-28">
+              <Label className="text-[10px] uppercase tracking-wider text-zinc-500">
+                Log Entries: {config.log_entries}
+              </Label>
+              <Slider
+                value={[config.log_entries]}
+                onValueChange={([v]) => updateConfig("log_entries", v)}
+                min={1}
+                max={20}
+                step={1}
+                data-testid="compare-log-entries-slider"
+              />
+            </div>
+
+            <Separator orientation="vertical" className="h-8 bg-zinc-300" />
+
+            <div className="flex items-center gap-2">
+              <Label className="text-[10px] uppercase tracking-wider text-zinc-500">
+                Inject Leader Failure
+              </Label>
+              <Switch
+                checked={leaderFailure}
+                onCheckedChange={(checked) => {
+                  setLeaderFailure(checked);
+                  updateConfig("inject_leader_failure_at", checked ? 500 : null);
+                }}
+                data-testid="compare-leader-failure-switch"
+              />
+            </div>
+
+            {leaderFailure && (
+              <div className="w-28">
+                <Label className="text-[10px] uppercase tracking-wider text-zinc-500">
+                  Failure at Tick: {config.inject_leader_failure_at}
+                </Label>
+                <Slider
+                  value={[config.inject_leader_failure_at || 500]}
+                  onValueChange={([v]) => updateConfig("inject_leader_failure_at", v)}
+                  min={100}
+                  max={config.max_ticks - 100}
+                  step={50}
+                  data-testid="compare-leader-failure-tick-slider"
+                />
+              </div>
+            )}
+
+            {config.runs > 1 && leaderFailure && (
+              <p className="text-[10px] text-amber-600">
+                Leader failure injection is ignored in statistical mode
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Results */}
       {mode === "statistical" && statResults ? (
